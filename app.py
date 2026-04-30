@@ -1,34 +1,39 @@
 import gradio as gr
 import requests
 
-API_URL = "https://afl-api-168340537629.australia-southeast1.run.app/predict"
+API_URL = "https://afl-api-168340537629.australia-southeast1.run.app/predict_match"
 
-def predict(elo, form, score, rest, home):
+teams = [
+    "Collingwood", "Carlton", "Richmond", "Melbourne",
+    "Hawthorn", "Geelong", "Sydney", "Brisbane Lions"
+]
+
+def predict(home_team, away_team):
+
     payload = {
-        "elo_diff": elo,
-        "form_diff": form,
-        "score_diff": score,
-        "rest_diff": rest,
-        "home_ground": home
+        "home_team": home_team,
+        "away_team": away_team
     }
 
     try:
         r = requests.post(API_URL, json=payload)
         result = r.json()
-        return f"Prediction: {result['prediction']} | Prob: {result['probability']:.2f}"
+
+        winner = home_team if result["prediction"] == 1 else away_team
+        prob = result["probability"] * 100
+
+        return f"🏆 {winner} likely to WIN ({prob:.1f}%)"
+
     except Exception as e:
         return f"Error: {e}"
 
 gr.Interface(
     fn=predict,
     inputs=[
-        gr.Number(label="ELO Diff"),
-        gr.Number(label="Form Diff"),
-        gr.Number(label="Score Diff"),
-        gr.Number(label="Rest Diff"),
-        gr.Radio([0,1], label="Home Ground")
+        gr.Dropdown(teams, label="Home Team"),
+        gr.Dropdown(teams, label="Away Team"),
     ],
     outputs="text",
-    title="AFL Predictor",
-    description="Powered by FastAPI on GCP"
+    title="🏉 AFL Match Outcome Predictor",
+    description="Predict AFL match results using ML model"
 ).launch()
