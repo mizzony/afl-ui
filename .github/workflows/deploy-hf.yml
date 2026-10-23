@@ -1,0 +1,41 @@
+# Pushes this repo to a Hugging Face Space so the app gets a public link.
+#
+# One-time setup in GitHub (repo Settings -> Secrets and variables -> Actions):
+#   Secret   HF_TOKEN  : a Hugging Face token with "write" access
+#   Variable HF_SPACE  : your Space, e.g. mizzony/afl-predictor-v2
+# The Space must already exist (create it on huggingface.co as a Gradio Space).
+#
+# Runs on every push to main or improved-model-and-app, or by hand from the Actions tab.
+name: Deploy to Hugging Face Space
+
+on:
+  push:
+    branches: [main, improved-model-and-app]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check setup
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_SPACE: ${{ vars.HF_SPACE }}
+        run: |
+          if [ -z "$HF_TOKEN" ] || [ -z "$HF_SPACE" ]; then
+            echo "::error::Add secret HF_TOKEN and variable HF_SPACE in repo settings first."
+            exit 1
+          fi
+
+      - name: Push to Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_SPACE: ${{ vars.HF_SPACE }}
+        run: |
+          HF_USER="${HF_SPACE%%/*}"
+          git push --force "https://${HF_USER}:${HF_TOKEN}@huggingface.co/spaces/${HF_SPACE}" HEAD:main
+          echo "Live at: https://huggingface.co/spaces/${HF_SPACE}"
