@@ -137,20 +137,46 @@ class Engine:
         now = pd.Timestamp.now(tz="Australia/Melbourne").tz_localize(None)
         last = self.state.last_game_date or now
         date = max(now, last + pd.Timedelta(days=7))
-        f = self.state.features(home, away, venue, date, int(date.year), int(is_final))
+        season, off_season = self.next_game_season(now)
+        f = self.state.features(home, away, venue, date, season, int(is_final))
         row = pd.DataFrame([f])
         margin = float(self.model.predict_margin(row)[0])
         prob = float(self.model.predict_proba(row)[0])
         contrib = self.model.contributions(row)
         return {"home": home, "away": away, "venue": venue, "prob_home": prob,
-                "margin": margin, "features": f, "contrib": contrib}
+                "margin": margin, "features": f, "contrib": contrib,
+                "season": season, "off_season": off_season}
+
+    def next_game_season(self, now: pd.Timestamp | None = None) -> tuple[int, bool]:
+        """Season the next game belongs to, and whether we are in the off-season.
+
+        - Games still to play in the data: their season (ratings move back toward
+          average automatically if that is a new season).
+        - No games left and the last game was over 2 weeks ago: off-season, so use
+          next season's start-of-season ratings.
+        - Otherwise: the current season.
+        """
+        now = now or pd.Timestamp.now(tz="Australia/Melbourne").tz_localize(None)
+        current = self.state.elo.season or int(now.year)
+        up = self.games[self.games["complete"] < 100]
+        if len(up):
+            nxt = int(up["year"].iloc[0])
+            return nxt, nxt > current
+        last = self.state.last_game_date
+        if last is not None and (now - last).days > 14:
+            return current + 1, True
+        return current, False
 
     # ------------------------------------------------------------ tables
     def elo_ladder(self) -> pd.DataFrame:
+        season, off = self.next_game_season()
         r = sorted(((t, self.state.elo.rating(t)) for t in TEAMS), key=lambda x: -x[1])
         rows = []
         for i, (t, rating) in enumerate(r, 1):
-            rows.append({"#": i, "Team": t, "ELO": round(rating),
+            row = {"#": i, "Team": t, "ELO (end of last season)" if off else "ELO": round(rating)}
+            if off:
+                row[f"ELO (start of {season})"] = round(self.state.elo.rating(t, season))
+            rows.append({**row,
                          "Last 5 avg margin": round(self.state._form(t), 1),
                          "Last 5 avg score": round(self.state._attack(t), 1)})
         return pd.DataFrame(rows)

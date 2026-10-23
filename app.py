@@ -70,6 +70,9 @@ def predict(home, away, venue, is_final, home_odds, away_odds):
 
     verdict = (f"## 🏆 {winner} to win\n"
                f"**{pw:.0%} chance** · tipped margin **{abs(m):.0f} points** · {p['venue']}")
+    if p["off_season"]:
+        verdict += (f"\n\n<span class='small-note'>Off-season: using start-of-{p['season']} "
+                    "ratings (moved part way back to average, as happens every new season).</span>")
     probs = {home: ph, away: 1 - ph}
 
     # Why: biggest factors, in points of margin.

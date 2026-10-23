@@ -102,6 +102,21 @@ def test_engine_offline():
     assert len(e.elo_ladder()) == 18
 
 
+def test_off_season_uses_next_season_ratings():
+    e = Engine.build(prefer_live=False)
+    last = e.state.last_game_date
+    season = e.state.elo.season
+    # Mid-season (a few days after the last game): current season, no adjustment.
+    assert e.next_game_season(last + pd.Timedelta(days=5)) == (season, False)
+    # Long after the last game with nothing left to play: next season.
+    assert e.next_game_season(last + pd.Timedelta(days=60)) == (season + 1, True)
+    p = e.predict_match("Sydney", "Geelong", "S.C.G.")  # "now" is long after the bundled data
+    assert p["off_season"] and p["season"] == season + 1
+    raw = e.state.elo.rating("Sydney")
+    assert abs(p["features"]["elo_home"] - (1500 + 0.85 * (raw - 1500))) < 1e-9
+    assert "ELO (start of" in " ".join(e.elo_ladder().columns)
+
+
 def test_prediction_does_not_change_state():
     e = Engine.build(prefer_live=False)
     before = e.elo_ladder()
