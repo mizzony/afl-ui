@@ -7,6 +7,7 @@ sdk: gradio
 sdk_version: 6.30.0
 app_file: app.py
 pinned: false
+suggested_hardware: cpu-basic
 license: mit
 ---
 

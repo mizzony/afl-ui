@@ -25,8 +25,11 @@ HISTORY_CSV = ROOT / "data" / "games_history.csv"
 CACHE_DIR = Path(os.getenv("AFL_CACHE_DIR", ROOT / ".cache"))
 
 SQUIGGLE_URL = "https://api.squiggle.com.au/"
-# Squiggle asks every client to identify itself with a contact in the User-Agent.
-USER_AGENT = os.getenv("SQUIGGLE_USER_AGENT", "afl-ui predictor (github.com/mizzony/afl-ui)")
+# Squiggle asks every client to identify itself with a contact in the User-Agent,
+# and answers 403 to generic or anonymous ones. Set SQUIGGLE_USER_AGENT (a Space
+# secret) to something like "AFL-UI-Predictor (you@example.com)".
+USER_AGENT = os.getenv("SQUIGGLE_USER_AGENT",
+                       "AFL-UI-Predictor/2.0 (+https://github.com/mizzony/afl-ui)")
 FIRST_YEAR = 2000
 LIVE_REFRESH_SECONDS = 3 * 60 * 60
 
@@ -44,9 +47,15 @@ def _squiggle_year(year: int, current_year: int, timeout: int = 20) -> list[dict
         age = time.time() - path.stat().st_mtime
         if not live or age < LIVE_REFRESH_SECONDS:
             return json.loads(path.read_text())
-    resp = requests.get(SQUIGGLE_URL, params={"q": f"games;year={year}"},
-                        headers={"User-Agent": USER_AGENT}, timeout=timeout)
-    resp.raise_for_status()
+    # Build the query by hand: Squiggle's documented format uses a literal ";",
+    # which `params=` would encode as %3B.
+    resp = requests.get(f"{SQUIGGLE_URL}?q=games;year={year}",
+                        headers={"User-Agent": USER_AGENT, "Accept": "application/json"},
+                        timeout=timeout)
+    if resp.status_code != 200:
+        raise requests.HTTPError(
+            f"Squiggle {resp.status_code} for {year} (User-Agent: {USER_AGENT!r}): "
+            f"{resp.text[:200]!r}")
     games = resp.json().get("games", [])
     path.write_text(json.dumps(games))
     return games

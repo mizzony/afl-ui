@@ -10,6 +10,18 @@ from afl.teams import TEAMS, short
 ROOT = Path(__file__).resolve().parent
 BACKTEST_CSV = ROOT / "data" / "backtest_summary.csv"
 
+# This app only needs a CPU. If the Space is set to ZeroGPU hardware, it refuses to
+# start unless at least one @spaces.GPU function exists, so register a no-op one.
+# (Better: set the Space hardware to "CPU basic" in Settings.)
+try:
+    import spaces
+
+    @spaces.GPU
+    def _zero_gpu_placeholder():
+        return None
+except ImportError:
+    pass
+
 engine = get_engine()  # build at start-up so the first click is fast
 
 CSS = """
