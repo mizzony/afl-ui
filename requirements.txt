@@ -1,2 +1,5 @@
-gradio
+gradio>=6.0
 requests
+pandas>=2.0
+numpy
+scikit-learn
